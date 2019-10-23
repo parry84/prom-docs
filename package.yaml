@@ -1,0 +1,49 @@
+name:                prom-docs
+version:             0.1.0.0
+github:              "parry84/prom-docs"
+license:             All rights reserved
+author:              "Emanuele Parrinello"
+maintainer:          "parry84@gmail.com"
+copyright:           "2019 Emanuele Parrinello"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            Scrape Prometheus metrics and generate a reference
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/parry84/prom-docs#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- optparse-applicative
+
+library:
+  source-dirs: src
+
+executables:
+  prom-docs-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - prom-docs
+
+tests:
+  my-project-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - prom-docs
