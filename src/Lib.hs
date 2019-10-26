@@ -151,8 +151,12 @@ getFile :: File -> IO String
 --getFile (URL str) = mconcat . toChunks <$> simpleHttp str
 getFile (Local fp) = readFile fp
 
-generate :: [File] -> IO ()
-generate logFiles = do
+getOutput :: Maybe FilePath -> String -> IO ()
+getOutput (Nothing) = putStrLn
+getOutput (Just f)  = writeFile f
+
+generate :: [File] -> Maybe FilePath -> IO ()
+generate logFiles output = do
     files <- mapM getFile logFiles
         -- Parsed logs
     let logs :: [String]
@@ -162,4 +166,4 @@ generate logFiles = do
         -- Merged log
         mergedLog :: String
         mergedLog = header ++ (foldr (++) [] logsWithHeaders) ++ footer
-    writeFile "metrics.html" mergedLog
+    getOutput output mergedLog

@@ -1,7 +1,6 @@
 name:                prom-docs
 version:             0.1.0.0
 github:              "parry84/prom-docs"
-license:             All rights reserved
 author:              "Emanuele Parrinello"
 maintainer:          "parry84@gmail.com"
 copyright:           "2019 Emanuele Parrinello"
@@ -27,7 +26,7 @@ library:
   source-dirs: src
 
 executables:
-  prom-docs-exe:
+  prom-docs:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
