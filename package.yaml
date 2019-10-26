@@ -2,6 +2,7 @@ name:                prom-docs
 version:             0.1.0.0
 github:              "parry84/prom-docs"
 author:              "Emanuele Parrinello"
+license:             Apache
 maintainer:          "parry84@gmail.com"
 copyright:           "2019 Emanuele Parrinello"
 
