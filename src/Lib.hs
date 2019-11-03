@@ -1,15 +1,12 @@
 module Lib
-    ( generate,
-    File (..)
+    ( generate
     ) where
+
+import Input
 
 type Name = String
 
 type Description = String
-
-data File
-    = URL String
-    | Local FilePath
 
 data MetricType
     = Counter
@@ -134,10 +131,10 @@ footer =
 toDocument :: [Metric] -> String
 toDocument (x) = tableHeader ++ (unwords (map toHtml x)) ++ tableFooter
 
-renderFile :: File -> String
-renderFile (Local fp) = "<h1>" ++ fp ++ "</h1>"
+renderFile :: String -> String
+renderFile fp = "<h1>" ++ fp ++ "</h1>"
 
-getHeaders :: [File] -> [String]
+getHeaders :: [String] -> [String]
 getHeaders (xs) = fmap renderFile xs
 
 merge :: [a] -> [a] -> [a]
@@ -145,25 +142,28 @@ merge xs [] = xs
 merge [] ys = ys
 merge (x:xs) (y:ys) = x : y : merge xs ys
 
-getFile :: File -> IO String
--- simpleHttp gets a lazy bytestring, while we
--- are using strict bytestrings.
---getFile (URL str) = mconcat . toChunks <$> simpleHttp str
-getFile (Local fp) = readFile fp
+getFile :: String -> IO String
+getFile fp = readFile fp
 
 getOutput :: Maybe FilePath -> String -> IO ()
 getOutput (Nothing) = putStrLn
 getOutput (Just f)  = writeFile f
 
-generate :: [File] -> Maybe FilePath -> IO ()
-generate logFiles output = do
+extractPaths :: [LogFile] -> [String]
+extractPaths a = fmap path a
+ 
+generate :: Maybe FilePath -> String -> IO ()
+generate output configuration = do
+    
+    let config = readInput configuration :: IO [LogFile]
+    logFiles <- fmap extractPaths config
     files <- mapM getFile logFiles
-        -- Parsed logs
+        
     let logs :: [String]
         logs = fmap (toDocument . toMetrics . toPairs . skipUnknown . parse) files
         logsWithHeaders :: [String]
         logsWithHeaders = merge (getHeaders logFiles) logs
-        -- Merged log
+        
         mergedLog :: String
         mergedLog = header ++ (foldr (++) [] logsWithHeaders) ++ footer
     getOutput output mergedLog
