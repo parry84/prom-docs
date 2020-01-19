@@ -4,9 +4,12 @@ import Lib
 
 import Options.Applicative
 
+type FileName = String
+
 data Cmdline = Cmdline
-  { output        :: Maybe String
-  , configuration :: String
+  { output        :: Maybe FileName
+  , configuration :: FileName
+  , css           :: FileName
   , verbose       :: Bool }
 
 cmdline :: Parser Cmdline
@@ -22,6 +25,12 @@ cmdline = Cmdline
         <> metavar "CONFIG"
         <> value "input.yaml"
         <> help "Specify a configuration file (default is input.yaml)" )
+    <*> strOption
+        ( long "css"
+        <> short 's'
+        <> metavar "CSS"
+        <> value "./css/style.css"
+        <> help "Specify a CSS file (default is ./css/style.css)" )
     <*> switch
         ( long "verbose"
         <> short 'v'
@@ -36,4 +45,4 @@ main = promDocs =<< execParser opts
      <> header "prom-docs - a metrics reference generator for Prometheus" )
 
 promDocs :: Cmdline -> IO ()
-promDocs (Cmdline output configuration _) = generate output configuration
+promDocs (Cmdline output configuration css _) = generate output configuration css

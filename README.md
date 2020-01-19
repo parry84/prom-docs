@@ -1,12 +1,15 @@
+
 prom-docs - a metrics reference generator for Prometheus
 
 ```
-Usage: prom-docs [-o|--output OUTPUT] [-c|--config CONFIG] [-v|--verbose]
+Usage: prom-docs [-o|--output OUTPUT] [-c|--config CONFIG] [-s|--css CSS]
+                 [-v|--verbose]
   Prometheus metrics reference generator
 
 Available options:
   -o,--output OUTPUT       Write to a file instead of stdout
   -c,--config CONFIG       Specify a configuration file (default is input.yaml)
+  -s,--css CSS             Specify a CSS file (default is ./css/style.css)
   -v,--verbose             Make the operation more talkative
   -h,--help                Show this help text
 ```
@@ -26,4 +29,11 @@ The configuration file is a Yaml file that list the Prometheus sources to be scr
   path: "./queue.metrics"
 - source: local
   path: "./db.metrics"
+```
+
+Building
+--------
+Clone the repository and run:
+```
+stack build
 ```

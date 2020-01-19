@@ -97,11 +97,12 @@ toHtml (x) =
 toMetrics :: [(ScrapeLine, ScrapeLine)] -> [Metric]
 toMetrics (xs) = map toMetric xs
 
-header =
+header :: String -> String
+header css =
     "\
 \<html>\n\
 \  <head>\n\
-\    <link rel=\"stylesheet\" href=\"./css/style.css\"/>\n\
+\    <link rel=\"stylesheet\" href=\"" ++ css ++ "\"/>\n\
 \    <link rel=\"stylesheet\" href=\"https://use.fontawesome.com/releases/v5.7.2/css/all.css\" integrity=\"sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr\" crossorigin=\"anonymous\">\n\
 \  </head>\n\
 \  <body>\n"
@@ -152,8 +153,8 @@ getOutput (Just f)  = writeFile f
 extractPaths :: [LogFile] -> [String]
 extractPaths a = fmap path a
  
-generate :: Maybe FilePath -> String -> IO ()
-generate output configuration = do
+generate :: Maybe FilePath -> String -> String -> IO ()
+generate output configuration css = do
     
     let config = readInput configuration :: IO [LogFile]
     logFiles <- fmap extractPaths config
@@ -165,5 +166,5 @@ generate output configuration = do
         logsWithHeaders = merge (getHeaders logFiles) logs
         
         mergedLog :: String
-        mergedLog = header ++ (foldr (++) [] logsWithHeaders) ++ footer
+        mergedLog = (header css) ++ (foldr (++) [] logsWithHeaders) ++ footer
     getOutput output mergedLog
