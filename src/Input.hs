@@ -1,14 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Input
-  ( readInput,
-  File (..),
-  LogFile (..)
-  ) where
+  ( readInput
+  , File(..)
+  , LogFile(..)
+  )
+where
 
-import qualified Data.ByteString.Char8 as BS
-import Data.Maybe (fromJust)
-import Data.Yaml
+import qualified Data.ByteString.Char8         as BS
+import           Data.Maybe                     ( fromJust )
+import           Data.Yaml
 
 data File
   = URL String
