@@ -7,9 +7,10 @@ module Input
   )
 where
 
-import qualified Data.ByteString.Char8         as BS
-import           Data.Maybe                     ( fromJust )
-import           Data.Yaml
+import qualified Data.ByteString.Char8 as BS
+import           Data.Maybe            (fromJust)
+import           Data.Yaml             (FromJSON (parseJSON), Value (Object),
+                                        decodeEither', (.:))
 
 data File
   = URL String
@@ -17,15 +18,17 @@ data File
 
 data LogFile = LogFile
   { source :: String
-  , path :: String
+  , path   :: String
   } deriving (Show)
 
 instance FromJSON LogFile where
   parseJSON (Object m) = LogFile <$> m .: "source" <*> m .: "path"
-  parseJSON _ = error "Can't parse LogFile from YAML/JSON"
+  parseJSON _          = error "Can't parse LogFile from YAML/JSON"
 
 readInput :: String -> IO [LogFile]
 readInput f = do
   ymlData <- BS.readFile f
-  let logFiles = Data.Yaml.decode ymlData :: Maybe [LogFile]
-  return $ fromJust logFiles
+  case Data.Yaml.decodeEither' ymlData of
+    Left err       -> error $ "Could not parse input.yaml: " ++ show err
+    Right logFiles -> return logFiles
+

@@ -19,11 +19,11 @@ data MetricType
 
 parseMetricType :: String -> MetricType
 parseMetricType metricType = case metricType of
-  ("counter"  ) -> Counter
-  ("gauge"    ) -> Gauge
-  ("histogram") -> Histogram
-  ("summary"  ) -> Summary
-  _             -> Untyped
+  "counter"   -> Counter
+  "gauge"     -> Gauge
+  "histogram" -> Histogram
+  "summary"   -> Summary
+  _           -> Untyped
 
 renderMetricType :: MetricType -> String
 renderMetricType metricType = case metricType of
@@ -62,7 +62,7 @@ isNotUnknown Unknown = False
 isNotUnknown _       = True
 
 skipUnknown :: [ScrapeLine] -> [ScrapeLine]
-skipUnknown xs = filter isNotUnknown xs
+skipUnknown = filter isNotUnknown
 
 toPairs :: [ScrapeLine] -> [(ScrapeLine, ScrapeLine)]
 toPairs [] = []
@@ -80,7 +80,7 @@ toHtml x = case x of
     "\n\
     \            <tr>\n\
     \              <td><i class=\""
-      ++ (renderMetricType metricType)
+      ++ renderMetricType metricType
       ++ "\"></i></td>\n\
     \              <td><code class=\"highlighter-rouge\">"
       ++ name
@@ -91,7 +91,7 @@ toHtml x = case x of
     \            </tr>"
 
 toMetrics :: [(ScrapeLine, ScrapeLine)] -> [Metric]
-toMetrics xs = map toMetric xs
+toMetrics = map toMetric
 
 header :: String -> String
 header css =
@@ -126,13 +126,13 @@ footer = "\
 \</html>\n"
 
 toDocument :: [Metric] -> String
-toDocument x = tableHeader ++ (unwords (map toHtml x)) ++ tableFooter
+toDocument x = tableHeader ++ unwords (fmap toHtml x) ++ tableFooter
 
 renderFile :: String -> String
 renderFile fp = "<h1>" ++ fp ++ "</h1>"
 
 getHeaders :: [String] -> [String]
-getHeaders xs = fmap renderFile xs
+getHeaders = fmap renderFile
 
 merge :: [a] -> [a] -> [a]
 merge xs       []       = xs
@@ -140,14 +140,14 @@ merge []       ys       = ys
 merge (x : xs) (y : ys) = x : y : merge xs ys
 
 getFile :: String -> IO String
-getFile fp = readFile fp
+getFile = readFile
 
 getOutput :: Maybe FilePath -> String -> IO ()
-getOutput (Nothing) = putStrLn
+getOutput Nothing   = putStrLn
 getOutput (Just f ) = writeFile f
 
 extractPaths :: [LogFile] -> [String]
-extractPaths a = fmap path a
+extractPaths = fmap path
 
 generate :: Maybe FilePath -> String -> String -> IO ()
 generate output configuration css = do
@@ -163,5 +163,5 @@ generate output configuration css = do
       logsWithHeaders = merge (getHeaders logFiles) logs
 
       mergedLog :: String
-      mergedLog = (header css) ++ (foldr (++) [] logsWithHeaders) ++ footer
+      mergedLog = header css ++ concat logsWithHeaders ++ footer
   getOutput output mergedLog
