@@ -3,7 +3,23 @@ module Lib
   )
 where
 
-import           Input
+import           Data.Either                (rights)
+import           Data.Functor
+import           Data.List                  (nub)
+import           Data.Map                   as M (Map, empty, findWithDefault,
+                                                  insert, toList)
+import           Data.Number.Transfinite    ()
+import           Data.Scientific            (Scientific)
+import           Input                      (LogFile (path), readInput)
+import           Text.Megaparsec            (MonadParsec (try), Parsec,
+                                             anySingle, many, manyTill, noneOf,
+                                             oneOf, optional, parse, sepBy,
+                                             some, (<|>))
+import           Text.Megaparsec.Char       (alphaNumChar, char, eol,
+                                             letterChar, space, spaceChar,
+                                             string)
+import           Text.Megaparsec.Char.Lexer (decimal, float, lexeme, scientific,
+                                             signed)
 
 type Name = String
 
@@ -15,7 +31,33 @@ data MetricType
     | Summary
     | Untyped
     | Histogram
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
+
+data MetricInfo = MetricInfo MetricType String [String]
+
+data CommentLine
+    = HelpLine String String
+    | TypeLine String MetricType
+    | Comment String
+    deriving (Show, Eq, Ord)
+
+data Sample = Sample String (Maybe [Label]) String (Maybe Integer) deriving (Show, Eq, Ord)
+
+data Line = CL CommentLine | SL Sample | Blank deriving (Show, Eq, Ord)
+
+data Label = Label { labelName:: String, labelValue:: String} deriving (Show, Eq, Ord)
+
+data Metric = Metric Name Description MetricType deriving (Show, Eq, Ord)
+
+newtype Metrics = Metrics [Line] deriving (Show, Eq, Ord)
+
+type Parser = Parsec Metrics String
+
+metricTypeP :: Parser MetricType
+metricTypeP = string "counter" $>  Counter
+       <|> string "gauge" $>  Gauge
+       <|> string "histogram" $>  Histogram
+       <|> string "summary" $> Summary
 
 parseMetricType :: String -> MetricType
 parseMetricType metricType = case metricType of
@@ -33,54 +75,147 @@ renderMetricType metricType = case metricType of
   Summary   -> "fas fa-file-alt"
   Untyped   -> "fas fa-circle"
 
-data ScrapeLine
-    = HelpLine String
-                String
-    | TypeLine String
-                MetricType
-    | Unknown
-    deriving (Show, Eq)
+helpLineP :: Parser CommentLine
+helpLineP = do
+  char '#'
+  space
+  string "HELP"
+  space
+  metric <- identifier
+  space
+  help <-  manyTill anySingle eol
+  pure $ HelpLine metric help
 
-data Metric =
-    Metric Name
-            Description
-            MetricType
-    deriving (Show, Eq)
+typeLineP :: Parser CommentLine
+typeLineP = do
+  char '#'
+  space
+  string "TYPE"
+  space
+  metric <- identifier
+  space
+  t <- metricTypeP
+  eol
+  pure $ TypeLine metric t
 
-parseMessage :: String -> ScrapeLine
-parseMessage line = case words line of
-  ("#" : "HELP" : name : description) -> HelpLine name (unwords description)
-  ("#" : "TYPE" : name : metricType) ->
-    TypeLine name (parseMetricType (unwords metricType))
-  _ -> Unknown
+commentP :: Parser CommentLine
+commentP = do
+  char '#'
+  space
+  comment <- manyTill anySingle eol
+  pure $ Comment comment
 
-parse :: String -> [ScrapeLine]
-parse = map parseMessage . lines
+commentLineP :: Parser Line
+commentLineP = CL <$> (try typeLineP <|> try helpLineP <|> commentP)
 
-isNotUnknown :: ScrapeLine -> Bool
-isNotUnknown Unknown = False
-isNotUnknown _       = True
+timestampP :: Parser Integer
+timestampP = do
+  some $ char ' '
+  signed space decimal
 
-skipUnknown :: [ScrapeLine] -> [ScrapeLine]
-skipUnknown = filter isNotUnknown
+sampleP :: Parser Line
+sampleP = do
+  metric <- identifier
+  labels <- optional labelsP
+  space
+  value <-  show <$> scientific <|> string "+Inf" <|> string "-Inf" <|> string "NaN"
+  timestamp <- optional timestampP
+  eol
+  pure $ SL $ Sample metric labels value timestamp
 
-toPairs :: [ScrapeLine] -> [(ScrapeLine, ScrapeLine)]
-toPairs [] = []
-toPairs (helpLine : typeLine : restOfList) =
-  (helpLine, typeLine) : toPairs restOfList
+labelsP :: Parser [Label]
+labelsP = do
+  char '{'
+  labels <- labelP `sepBy` char ','
+  char '}'
+  pure labels
 
-toMetric :: (ScrapeLine, ScrapeLine) -> Metric
-toMetric x = case x of
-  (HelpLine name description, TypeLine _ metricType) ->
-    Metric name description metricType
+labelP :: Parser Label
+labelP = do
+  label <- identifier
+  char '='
+  Label label <$> stringP
 
-toHtml :: Metric -> String
-toHtml x = case x of
-  Metric name description metricType ->
+escape :: Parser String
+escape = do
+    d <- char '\\'
+    c <- oneOf "\\\"0nrvtbf" -- all the characters which can be escaped
+    return [d, c]
+
+nonEscape :: Parser Char
+nonEscape = noneOf "\\\"\0\n\r\v\t\b\f"
+
+character :: Parser String
+character = fmap return nonEscape <|> escape
+
+stringP :: Parser String
+stringP = do
+    char '"'
+    strings <- many character
+    char '"'
+    return $ concat strings
+
+identifier :: Parser String
+identifier = some (alphaNumChar <|> char '_')
+
+
+blankP :: Parser Line
+blankP = do
+  _ <- eol
+  pure Blank
+
+lineP :: Parser Line
+lineP = try commentLineP <|> sampleP <|> blankP
+
+metricsP :: Parser Metrics
+metricsP = Metrics <$> some lineP
+
+extractPaths :: [LogFile] -> [String]
+extractPaths = fmap path
+
+getFile :: String -> IO String
+getFile = readFile
+
+generate :: Maybe FilePath -> String -> String -> IO ()
+generate output configuration css = do
+  let config = readInput configuration :: IO [LogFile]
+  logFiles <- fmap extractPaths config
+  files    <- traverse getFile logFiles
+  let parsed = parse metricsP "" <$> files
+  let rendered = (fmap . fmap) (toDocument . sortMetrics) parsed
+  let logsWithHeaders = merge (getHeaders logFiles) (rights rendered)
+  let mergedLog = header css ++ concat logsWithHeaders ++ footer
+  getOutput output mergedLog
+
+newMetricInfo :: MetricInfo
+newMetricInfo = MetricInfo Untyped "" []
+
+sortMetrics :: Metrics -> Map String MetricInfo
+sortMetrics (Metrics lines) = Prelude.foldr go M.empty lines
+  where
+    go :: Line -> Map String MetricInfo -> Map String MetricInfo
+    go metric acc = case metric of
+      (CL (HelpLine m help)) -> M.insert m (setHelp (findWithDefault newMetricInfo m acc) help) acc
+      (CL (TypeLine m t)) -> M.insert m (setType (findWithDefault newMetricInfo m acc) t) acc
+      (SL (Sample m (Just labels) _value _)) -> M.insert m (setLabels (findWithDefault newMetricInfo m acc) labels) acc
+      _ -> acc
+
+setHelp :: MetricInfo -> String -> MetricInfo
+setHelp (MetricInfo t _ labels) help = MetricInfo t help labels
+
+setType :: MetricInfo -> MetricType -> MetricInfo
+setType (MetricInfo _ help labels) t = MetricInfo t help labels
+
+setLabels :: MetricInfo -> [Label] -> MetricInfo
+setLabels (MetricInfo t help labels) l = MetricInfo t help $ nub $ labels ++ fmap labelName l
+
+toHtml :: String -> MetricInfo -> String
+toHtml name x = case x of
+  MetricInfo t description lables ->
     "\n\
     \            <tr>\n\
     \              <td><i class=\""
-      ++ renderMetricType metricType
+      ++ renderMetricType t
       ++ "\"></i></td>\n\
     \              <td><code class=\"highlighter-rouge\">"
       ++ name
@@ -89,9 +224,6 @@ toHtml x = case x of
       ++ description
       ++ "</td>\n\
     \            </tr>"
-
-toMetrics :: [(ScrapeLine, ScrapeLine)] -> [Metric]
-toMetrics = map toMetric
 
 header :: String -> String
 header css =
@@ -125,8 +257,8 @@ footer = "\
 \  </body>\n\
 \</html>\n"
 
-toDocument :: [Metric] -> String
-toDocument x = tableHeader ++ unwords (fmap toHtml x) ++ tableFooter
+toDocument :: Map String MetricInfo -> String
+toDocument x = tableHeader ++ unwords (fmap (\y -> toHtml (fst y) (snd y)) (toList x)) ++ tableFooter
 
 renderFile :: String -> String
 renderFile fp = "<h1>" ++ fp ++ "</h1>"
@@ -139,29 +271,6 @@ merge xs       []       = xs
 merge []       ys       = ys
 merge (x : xs) (y : ys) = x : y : merge xs ys
 
-getFile :: String -> IO String
-getFile = readFile
-
 getOutput :: Maybe FilePath -> String -> IO ()
-getOutput Nothing   = putStrLn
-getOutput (Just f ) = writeFile f
-
-extractPaths :: [LogFile] -> [String]
-extractPaths = fmap path
-
-generate :: Maybe FilePath -> String -> String -> IO ()
-generate output configuration css = do
-
-  let config = readInput configuration :: IO [LogFile]
-  logFiles <- fmap extractPaths config
-  files    <- mapM getFile logFiles
-
-  let logs :: [String]
-      logs =
-        fmap (toDocument . toMetrics . toPairs . skipUnknown . parse) files
-      logsWithHeaders :: [String]
-      logsWithHeaders = merge (getHeaders logFiles) logs
-
-      mergedLog :: String
-      mergedLog = header css ++ concat logsWithHeaders ++ footer
-  getOutput output mergedLog
+getOutput Nothing  = putStrLn
+getOutput (Just f) = writeFile f

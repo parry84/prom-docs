@@ -24,6 +24,10 @@ dependencies:
 - optparse-applicative
 - bytestring
 - yaml
+- megaparsec
+- scientific
+- logfloat
+- containers
 
 library:
   source-dirs: src

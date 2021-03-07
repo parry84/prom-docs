@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7048bc57f33a9f545e1cc0d5494a4fcb4706feb5d75c8a173413d3b6a73fe14a
+-- hash: 6ac4338fddd346a281b45251734a5cf72275b5070fc0580e4bc7ac68460126d8
 
 name:           prom-docs
 version:        0.1.0.0
@@ -36,7 +36,11 @@ library
   build-depends:
       base >=4.7 && <5
     , bytestring
+    , containers
+    , logfloat
+    , megaparsec
     , optparse-applicative
+    , scientific
     , yaml
   default-language: Haskell2010
 
@@ -50,8 +54,12 @@ executable prom-docs
   build-depends:
       base >=4.7 && <5
     , bytestring
+    , containers
+    , logfloat
+    , megaparsec
     , optparse-applicative
     , prom-docs
+    , scientific
     , yaml
   default-language: Haskell2010
 
@@ -66,7 +74,11 @@ test-suite my-project-test
   build-depends:
       base >=4.7 && <5
     , bytestring
+    , containers
+    , logfloat
+    , megaparsec
     , optparse-applicative
     , prom-docs
+    , scientific
     , yaml
   default-language: Haskell2010
