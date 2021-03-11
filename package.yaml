@@ -28,6 +28,7 @@ dependencies:
 - scientific
 - logfloat
 - containers
+- blaze-html
 
 library:
   source-dirs: src
