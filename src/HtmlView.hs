@@ -10,8 +10,6 @@ import           Data.Functor
 import           Data.List                  (nub)
 import           Data.Map                   as M (Map, empty, findWithDefault,
                                                   insert, toList)
-import           Data.Number.Transfinite    ()
-import           Data.Scientific            (Scientific)
 import           Input                      (LogFile (path), readInput)
 import           Parser                     (metricsP)
 import           Text.Megaparsec            (parse)
@@ -52,20 +50,21 @@ renderTable :: (String, Map String MetricInfo) -> Html
 renderTable file = do
     H.h1 $ toHtml $ fst file
     H.table $ do
-      H.thead $ do
+      H.thead $
         H.tr $ do
           H.th ""
           H.th "Name"
           H.th "Description"
-    mconcat $ fmap renderRow $ toList $ snd file
+      mconcat $ fmap renderRow $ toList $ snd file
 
 renderRow :: (String, MetricInfo) -> Html
 renderRow (name, MetricInfo t description lables) = do
    H.tr $ do
-      H.td $ do
+      H.td $
         H.i ! class_ (stringValue ( renderMetricType t )) $ do ""
-      H.td $ do
+      H.td $
         H.code ! class_ "highlighter-rouge" $ do toHtml name
+      H.td $
         H.code $ do toHtml description
 
 renderMetricType :: MetricType -> String
