@@ -1,8 +1,9 @@
 module Main where
 
-import           HtmlView
-
+import           HtmlView            (producePage)
+import           Input               (LogFile (path), readInput)
 import           Options.Applicative
+import           Parser              (toMetricInfo)
 
 type FileName = String
 
@@ -52,3 +53,13 @@ main = promDocs =<< execParser opts
 promDocs :: Cmdline -> IO ()
 promDocs (Cmdline output configuration css _) =
   generate output configuration css
+
+generate :: Maybe FilePath -> String -> String -> IO ()
+generate output configuration css = do
+  let config = readInput configuration :: IO [LogFile]
+  sorted <- toMetricInfo config
+  getOutput output $ producePage css sorted
+
+getOutput :: Maybe FilePath -> String -> IO ()
+getOutput Nothing  = putStrLn
+getOutput (Just f) = writeFile f

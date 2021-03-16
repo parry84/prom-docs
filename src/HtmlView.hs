@@ -1,39 +1,25 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module HtmlView
-  ( generate
+  ( producePage
   )
 where
 
-import           Data.Either                (rights, fromRight, isRight)
+import           Data.Either                     (fromRight, isRight, rights)
 import           Data.Functor
-import           Data.List                  (nub)
-import           Data.Map                   as M (Map, empty, findWithDefault,
-                                                  insert, toList)
-import           Input                      (LogFile (path), readInput)
-import           Parser                     (metricsP)
-import           Text.Megaparsec            (parse)
+import           Data.List                       (nub)
+import           Data.Map                        as M (Map, empty,
+                                                       findWithDefault, insert,
+                                                       toList)
 import           Types
 
-import Text.Blaze.Html5 as H
-    ( toHtml,
-      code,
-      h1,
-      head,
-      html,
-      i,
-      link,
-      table,
-      td,
-      th,
-      thead,
-      title,
-      tr,
-      stringValue,
-      Html,
-      (!) )
-import Text.Blaze.Html5.Attributes as A ( class_, href, rel )
-import Text.Blaze.Html.Renderer.Pretty (renderHtml)
+import           Text.Blaze.Html.Renderer.Pretty (renderHtml)
+import           Text.Blaze.Html5                as H (Html, code, h1, head,
+                                                       html, i, link,
+                                                       stringValue, table, td,
+                                                       th, thead, title, toHtml,
+                                                       tr, (!))
+import           Text.Blaze.Html5.Attributes     as A (class_, href, rel)
 
 producePage :: String -> [(String, Map String MetricInfo)] -> String
 producePage css logFiles = renderHtml $ go css logFiles
@@ -74,45 +60,3 @@ renderMetricType metricType = case metricType of
   Histogram -> "fas fa-chart-bar"
   Summary   -> "fas fa-file-alt"
   Untyped   -> "fas fa-circle"
-
-
-extractPaths :: [LogFile] -> [String]
-extractPaths = fmap path
-
-getFile :: String -> IO String
-getFile = readFile
-
-generate :: Maybe FilePath -> String -> String -> IO ()
-generate output configuration css = do
-  let config = readInput configuration :: IO [LogFile]
-  logFiles <- fmap extractPaths config
-  files    <- traverse getFile logFiles
-  let parsed = parse metricsP "" <$> files
-  let sorted = zip logFiles $ rights $ (fmap . fmap) sortMetrics parsed
-  getOutput output $ producePage css sorted
-
-newMetricInfo :: MetricInfo
-newMetricInfo = MetricInfo Untyped "" []
-
-sortMetrics :: Metrics -> Map String MetricInfo
-sortMetrics (Metrics lines) = Prelude.foldr go M.empty lines
-  where
-    go :: Line -> Map String MetricInfo -> Map String MetricInfo
-    go metric acc = case metric of
-      (CL (HelpLine m help)) -> M.insert m (setHelp (findWithDefault newMetricInfo m acc) help) acc
-      (CL (TypeLine m t)) -> M.insert m (setType (findWithDefault newMetricInfo m acc) t) acc
-      (SL (Sample m (Just labels) _value _)) -> M.insert m (setLabels (findWithDefault newMetricInfo m acc) labels) acc
-      _ -> acc
-
-setHelp :: MetricInfo -> String -> MetricInfo
-setHelp (MetricInfo t _ labels) help = MetricInfo t help labels
-
-setType :: MetricInfo -> MetricType -> MetricInfo
-setType (MetricInfo _ help labels) t = MetricInfo t help labels
-
-setLabels :: MetricInfo -> [Label] -> MetricInfo
-setLabels (MetricInfo t help labels) l = MetricInfo t help $ nub $ labels ++ fmap labelName l
-
-getOutput :: Maybe FilePath -> String -> IO ()
-getOutput Nothing  = putStrLn
-getOutput (Just f) = writeFile f

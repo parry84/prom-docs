@@ -3,8 +3,6 @@ module Types
     MetricInfo(..),
     Metrics(..),
     Line(..),
-    CommentLine(..),
-    Sample(..),
     Label(..)
   )
 where
@@ -12,6 +10,8 @@ where
 type Name = String
 
 type Description = String
+
+type Value = String
 
 data MetricType
   = Counter
@@ -21,17 +21,15 @@ data MetricType
   | Histogram
   deriving (Show, Eq, Ord)
 
-data MetricInfo = MetricInfo MetricType String [String]
+data MetricInfo = MetricInfo MetricType Name [Description]
 
-data CommentLine
-  = HelpLine String String
-  | TypeLine String MetricType
+data Line
+  = HelpLine Name Description
+  | TypeLine Name MetricType
   | Comment String
+  | Sample Name (Maybe [Label]) Value (Maybe Integer)
+  | Blank
   deriving (Show, Eq, Ord)
-
-data Sample = Sample String (Maybe [Label]) String (Maybe Integer) deriving (Show, Eq, Ord)
-
-data Line = CL CommentLine | SL Sample | Blank deriving (Show, Eq, Ord)
 
 data Label = Label { labelName:: String, labelValue:: String} deriving (Show, Eq, Ord)
 

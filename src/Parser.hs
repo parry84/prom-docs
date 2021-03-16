@@ -1,5 +1,5 @@
 module Parser
-  ( metricsP
+  ( toMetricInfo
   )
 where
 
@@ -39,7 +39,7 @@ parseMetricType metricType = case metricType of
   "summary"   -> Summary
   _           -> Untyped
 
-helpLineP :: Parser CommentLine
+helpLineP :: Parser Line
 helpLineP = do
   char '#'
   space
@@ -50,7 +50,7 @@ helpLineP = do
   help <-  manyTill anySingle eol
   pure $ HelpLine metric help
 
-typeLineP :: Parser CommentLine
+typeLineP :: Parser Line
 typeLineP = do
   char '#'
   space
@@ -62,7 +62,7 @@ typeLineP = do
   eol
   pure $ TypeLine metric t
 
-commentP :: Parser CommentLine
+commentP :: Parser Line
 commentP = do
   char '#'
   space
@@ -70,7 +70,7 @@ commentP = do
   pure $ Comment comment
 
 commentLineP :: Parser Line
-commentLineP = CL <$> (try typeLineP <|> try helpLineP <|> commentP)
+commentLineP = try typeLineP <|> try helpLineP <|> commentP
 
 timestampP :: Parser Integer
 timestampP = do
@@ -85,7 +85,7 @@ sampleP = do
   value <-  show <$> scientific <|> string "+Inf" <|> string "-Inf" <|> string "NaN"
   timestamp <- optional timestampP
   eol
-  pure $ SL $ Sample metric labels value timestamp
+  pure $ Sample metric labels value timestamp
 
 labelsP :: Parser [Label]
 labelsP = do
@@ -133,3 +133,39 @@ lineP = try commentLineP <|> sampleP <|> blankP
 
 metricsP :: Parser Metrics
 metricsP = Metrics <$> some lineP
+
+toMetricInfo :: IO [LogFile] -> IO [(String, Map String MetricInfo)]
+toMetricInfo config = do
+  logFiles <- fmap extractPaths config
+  files    <- traverse getFile logFiles
+  let parsed = parse metricsP "" <$> files
+  pure $ zip logFiles $ rights $ (fmap . fmap) sortMetrics parsed
+
+extractPaths :: [LogFile] -> [String]
+extractPaths = fmap path
+
+getFile :: String -> IO String
+getFile = readFile
+
+
+sortMetrics :: Metrics -> Map String MetricInfo
+sortMetrics (Metrics lines) = Prelude.foldr go M.empty lines
+  where
+    go :: Line -> Map String MetricInfo -> Map String MetricInfo
+    go metric acc = case metric of
+      (HelpLine m help) -> M.insert m (setHelp (findWithDefault newMetricInfo m acc) help) acc
+      (TypeLine m t) -> M.insert m (setType (findWithDefault newMetricInfo m acc) t) acc
+      (Sample m (Just labels) _value _) -> M.insert m (setLabels (findWithDefault newMetricInfo m acc) labels) acc
+      _ -> acc
+
+setHelp :: MetricInfo -> String -> MetricInfo
+setHelp (MetricInfo t _ labels) help = MetricInfo t help labels
+
+setType :: MetricInfo -> MetricType -> MetricInfo
+setType (MetricInfo _ help labels) t = MetricInfo t help labels
+
+setLabels :: MetricInfo -> [Label] -> MetricInfo
+setLabels (MetricInfo t help labels) l = MetricInfo t help $ nub $ labels ++ fmap labelName l
+
+newMetricInfo :: MetricInfo
+newMetricInfo = MetricInfo Untyped "" []
