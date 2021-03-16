@@ -1,21 +1,44 @@
+{-# LANGUAGE ConstraintKinds            #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Main where
 
-import           HtmlView            (producePage)
-import           Input               (LogFile (path), readInput)
+import qualified Control.Exception    as E
+import           Control.Monad.Except (ExceptT, MonadError (throwError),
+                                       MonadIO (..), runExceptT)
+import           Control.Monad.Reader (MonadIO (..), MonadReader, ReaderT (..),
+                                       asks)
+import qualified Data.Bifunctor       as BF
+import qualified Data.Bool            as B
+import qualified Data.Char            as C
+import           Data.Map
+import           HtmlView             (producePage)
+import           Input                (LogFile (path), readInput)
 import           Options.Applicative
-import           Parser              (toMetricInfo)
+import           Parser               (toMetricInfo)
+import           Types
 
 type FileName = String
 
-data Cmdline = Cmdline
-  { output        :: Maybe FileName
-  , configuration :: FileName
-  , css           :: FileName
-  , verbose       :: Bool }
+data Options = Options
+    { oOutput        :: Maybe FileName
+    , oConfiguration :: FileName
+    , oCss           :: FileName
+    , oVerbose       :: Bool
+    }
 
-cmdline :: Parser Cmdline
+type AppConfig = MonadReader Options
+
+newtype AppError = IOError E.IOException
+
+newtype App a = App {
+    runApp :: ReaderT Options (ExceptT AppError IO) a
+} deriving (Monad, Functor, Applicative, AppConfig, MonadIO, MonadError AppError)
+
+cmdline :: Parser Options
 cmdline =
-  Cmdline
+  Options
     <$> optional
           (strOption
             (long "output" <> short 'o' <> metavar "OUTPUT" <> help
@@ -42,7 +65,7 @@ cmdline =
           )
 
 main :: IO ()
-main = promDocs =<< execParser opts
+main = runProgram =<< execParser opts
  where
   opts = info
     (cmdline <**> helper)
@@ -50,16 +73,34 @@ main = promDocs =<< execParser opts
       "prom-docs - a metrics reference generator for Prometheus"
     )
 
-promDocs :: Cmdline -> IO ()
-promDocs (Cmdline output configuration css _) =
-  generate output configuration css
+runProgram :: Options -> IO ()
+runProgram o = either renderError return =<< runExceptT (runReaderT (runApp run) o)
 
-generate :: Maybe FilePath -> String -> String -> IO ()
-generate output configuration css = do
-  let config = readInput configuration :: IO [LogFile]
-  sorted <- toMetricInfo config
-  getOutput output $ producePage css sorted
+renderError :: AppError -> IO ()
+renderError (IOError e) = do
+    putStrLn "There was an error:"
+    putStrLn $ "  " ++ show e
 
-getOutput :: Maybe FilePath -> String -> IO ()
-getOutput Nothing  = putStrLn
-getOutput (Just f) = writeFile f
+run :: App ()
+run = write =<< render =<< parse =<< getSource
+
+write :: String -> App ()
+write h = liftIO . maybe (putStrLn h) (`writeFile` h) =<< asks oOutput
+
+render :: AppConfig m => [(String, Map String MetricInfo)] -> m String
+render ms = asks ((`producePage` ms) . oCss)
+
+parse ::[LogFile] -> App [(String, Map String MetricInfo)]
+parse x = do liftIO $ toMetricInfo x
+
+getSource :: App [LogFile]
+getSource = do readInput <$> loadContents
+
+loadContents :: App String
+loadContents =
+    readFileFromOptions =<< asks oConfiguration
+  where
+    readFileFromOptions f = either throwError return . BF.first IOError =<< liftIO (safeReadFile f)
+
+safeReadFile :: FilePath -> IO (Either E.IOException String)
+safeReadFile = E.try . readFile

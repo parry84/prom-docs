@@ -29,6 +29,7 @@ dependencies:
 - logfloat
 - containers
 - blaze-html
+- mtl
 
 library:
   source-dirs: src

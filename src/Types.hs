@@ -1,9 +1,13 @@
+{-# LANGUAGE ConstraintKinds            #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Types
   ( MetricType(..),
     MetricInfo(..),
     Metrics(..),
     Line(..),
-    Label(..)
+    Label(..),
   )
 where
 

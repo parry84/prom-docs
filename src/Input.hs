@@ -25,10 +25,9 @@ instance FromJSON LogFile where
   parseJSON (Object m) = LogFile <$> m .: "source" <*> m .: "path"
   parseJSON _          = error "Can't parse LogFile from YAML/JSON"
 
-readInput :: String -> IO [LogFile]
-readInput f = do
-  ymlData <- BS.readFile f
-  case Data.Yaml.decodeEither' ymlData of
+readInput :: String -> [LogFile]
+readInput ymlData = do
+  case Data.Yaml.decodeEither' (BS.pack ymlData) of
     Left err       -> error $ "Could not parse input.yaml: " ++ show err
-    Right logFiles -> return logFiles
+    Right logFiles -> logFiles
 

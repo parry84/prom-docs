@@ -8,8 +8,6 @@ import           Data.Functor
 import           Data.List                  (nub)
 import           Data.Map                   as M (Map, empty, findWithDefault,
                                                   insert, toList)
-import           Data.Number.Transfinite    ()
-import           Data.Scientific            (Scientific)
 import           Input                      (LogFile (path), readInput)
 import           Text.Megaparsec            (MonadParsec (try), Parsec,
                                              anySingle, many, manyTill, noneOf,
@@ -134,9 +132,9 @@ lineP = try commentLineP <|> sampleP <|> blankP
 metricsP :: Parser Metrics
 metricsP = Metrics <$> some lineP
 
-toMetricInfo :: IO [LogFile] -> IO [(String, Map String MetricInfo)]
+toMetricInfo :: [LogFile] -> IO [(String, Map String MetricInfo)]
 toMetricInfo config = do
-  logFiles <- fmap extractPaths config
+  let logFiles = extractPaths config
   files    <- traverse getFile logFiles
   let parsed = parse metricsP "" <$> files
   pure $ zip logFiles $ rights $ (fmap . fmap) sortMetrics parsed
